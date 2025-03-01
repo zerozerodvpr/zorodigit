@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/queryClient";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { Files } from "lucide-react";
 
 export default function Dashboard() {
   const [_, setLocation] = useLocation();
@@ -21,13 +22,22 @@ export default function Dashboard() {
       <nav className="border-b">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-          <Button 
-            variant="ghost" 
-            onClick={() => logoutMutation.mutate()}
-            disabled={logoutMutation.isPending}
-          >
-            {logoutMutation.isPending ? "Logging out..." : "Logout"}
-          </Button>
+          <div className="flex items-center gap-4">
+            <Button
+              variant="outline"
+              onClick={() => setLocation("/admin/files")}
+            >
+              <Files className="h-4 w-4 mr-2" />
+              File Manager
+            </Button>
+            <Button 
+              variant="ghost" 
+              onClick={() => logoutMutation.mutate()}
+              disabled={logoutMutation.isPending}
+            >
+              {logoutMutation.isPending ? "Logging out..." : "Logout"}
+            </Button>
+          </div>
         </div>
       </nav>
 
@@ -38,7 +48,7 @@ export default function Dashboard() {
             Manage and review waitlist sign-ups
           </p>
         </div>
-        
+
         <WaitlistTable />
       </main>
     </div>
