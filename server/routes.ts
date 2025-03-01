@@ -127,7 +127,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/files", requireAuth, upload.single("file"), async (req, res) => {
     try {
       if (!req.file) {
-        throw new Error("No file uploaded");
+        return res.status(400).json({ message: "No file uploaded" });
       }
 
       const fileData = {
@@ -135,14 +135,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         type: req.file.mimetype,
         size: req.file.size,
         path: req.file.path,
-        folderId: req.body.folderId ? parseInt(req.body.folderId) : undefined,
+        folderId: req.body.folderId ? parseInt(req.body.folderId) : null,
       };
 
-      const file = insertFileSchema.parse(fileData);
-      const created = await storage.createFile(file);
-      res.json(created);
+      try {
+        const parsedFile = insertFileSchema.parse(fileData);
+        const created = await storage.createFile(parsedFile);
+        res.json(created);
+      } catch (error) {
+        // Clean up the uploaded file if validation fails
+        await fs.unlink(req.file.path);
+        throw error;
+      }
     } catch (error) {
-      res.status(400).json({ message: "Invalid input" });
+      console.error("File upload error:", error);
+      res.status(400).json({ 
+        message: error instanceof Error ? error.message : "Failed to upload file" 
+      });
     }
   });
 

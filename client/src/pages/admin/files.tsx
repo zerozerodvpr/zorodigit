@@ -13,11 +13,11 @@ import {
 } from "@/components/ui/table";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  FolderPlus, 
-  Upload, 
-  Folder, 
-  FileIcon, 
+import {
+  FolderPlus,
+  Upload,
+  Folder,
+  FileIcon,
   ChevronLeft,
   Trash2,
   Download,
@@ -34,13 +34,13 @@ export default function Files() {
 
   const { data: folders } = useQuery<FileFolder[]>({
     queryKey: ["/api/folders", currentFolderId],
-    queryFn: () => 
+    queryFn: () =>
       fetch(`/api/folders?${currentFolderId ? `parentId=${currentFolderId}` : ''}`).then(r => r.json())
   });
 
   const { data: files } = useQuery<File[]>({
     queryKey: ["/api/files", currentFolderId],
-    queryFn: () => 
+    queryFn: () =>
       fetch(`/api/files?${currentFolderId ? `folderId=${currentFolderId}` : ''}`).then(r => r.json())
   });
 
@@ -71,7 +71,16 @@ export default function Files() {
 
   const uploadFileMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      await apiRequest("POST", "/api/files", formData);
+      const response = await fetch("/api/files", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to upload file");
+      }
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/files", currentFolderId] });
@@ -80,11 +89,11 @@ export default function Files() {
         description: "File uploaded successfully",
       });
     },
-    onError: () => {
+    onError: (error: Error) => {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to upload file",
+        description: error.message || "Failed to upload file",
       });
     },
   });
@@ -140,6 +149,8 @@ export default function Files() {
     }
 
     uploadFileMutation.mutate(formData);
+    // Reset the input
+    event.target.value = "";
   };
 
   return (
