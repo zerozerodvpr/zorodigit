@@ -72,7 +72,7 @@ export const insertFileSchema = createInsertSchema(file).pick({
   type: z.string().min(1, "File type is required"),
   size: z.number().min(0, "File size must be positive"),
   path: z.string().min(1, "File path is required"),
-  folderId: z.number().optional(),
+  folderId: z.number().nullable(),
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;

@@ -18,7 +18,7 @@ export interface IStorage {
 
   createFile(file: InsertFile): Promise<File>;
   getFile(id: number): Promise<File | undefined>;
-  getFiles(folderId?: number): Promise<File[]>;
+  getFiles(folderId?: number | null): Promise<File[]>;
   updateFile(id: number, file: Partial<InsertFile>): Promise<File>;
   deleteFile(id: number): Promise<void>;
 }
@@ -71,7 +71,7 @@ export class MemStorage implements IStorage {
   }
 
   async getWaitlistEntries(): Promise<Waitlist[]> {
-    return Array.from(this.waitlist.values()).sort((a, b) => 
+    return Array.from(this.waitlist.values()).sort((a, b) =>
       b.createdAt.getTime() - a.createdAt.getTime()
     );
   }
@@ -140,6 +140,7 @@ export class MemStorage implements IStorage {
     const newFile: File = {
       ...file,
       id,
+      folderId: file.folderId || null, // Ensure null if undefined
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -151,9 +152,15 @@ export class MemStorage implements IStorage {
     return this.files.get(id);
   }
 
-  async getFiles(folderId?: number): Promise<File[]> {
+  async getFiles(folderId?: number | null): Promise<File[]> {
     return Array.from(this.files.values())
-      .filter(file => file.folderId === folderId)
+      .filter(file => {
+        // Handle both undefined and null cases
+        if (folderId === undefined || folderId === null) {
+          return file.folderId === null;
+        }
+        return file.folderId === folderId;
+      })
       .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
   }
 
