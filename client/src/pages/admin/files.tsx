@@ -176,6 +176,13 @@ export default function Files() {
             <h1 className="text-3xl font-bold">File Manager</h1>
           </div>
           <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => window.location.href = `/api/files/download-all${currentFolderId ? `?folderId=${currentFolderId}` : ''}`}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Download All
+            </Button>
             <Dialog open={isNewFolderDialogOpen} onOpenChange={setIsNewFolderDialogOpen}>
               <DialogTrigger asChild>
                 <Button>

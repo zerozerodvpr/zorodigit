@@ -7,6 +7,9 @@ import MemoryStore from "memorystore";
 import multer from "multer";
 import path from "path";
 import fs from "fs/promises";
+import { createWriteStream } from "fs";
+import { createGzip } from "zlib";
+import archiver from "archiver";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const SessionStore = MemoryStore(session);
@@ -204,6 +207,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper function to get all files in a folder recursively
+  async function getAllFilesInFolder(folderId: number | null): Promise<File[]> {
+    const files = await storage.getFiles(folderId);
+    const folders = await storage.getFolders(folderId);
+
+    const subFolderFiles = await Promise.all(
+      folders.map(folder => getAllFilesInFolder(folder.id))
+    );
+
+    return [...files, ...subFolderFiles.flat()];
+  }
+
+  app.get("/api/files/download-all", requireAuth, async (req, res) => {
+    try {
+      const folderId = req.query.folderId ? parseInt(req.query.folderId as string) : null;
+      const allFiles = await getAllFilesInFolder(folderId);
+
+      if (allFiles.length === 0) {
+        return res.status(404).json({ message: "No files found" });
+      }
+
+      const zipFileName = `zerodigit-files-${Date.now()}.zip`;
+      const zipFilePath = path.join("./uploads", zipFileName);
+      const output = createWriteStream(zipFilePath);
+      const archive = archiver("zip", { zlib: { level: 9 } });
+
+      output.on("close", () => {
+        res.download(zipFilePath, zipFileName, () => {
+          // Delete the zip file after download
+          fs.unlink(zipFilePath, () => {});
+        });
+      });
+
+      archive.on("error", (err) => {
+        throw err;
+      });
+
+      archive.pipe(output);
+
+      for (const file of allFiles) {
+        archive.file(file.path, { name: file.name });
+      }
+
+      await archive.finalize();
+    } catch (error) {
+      console.error("Download all error:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to download files" 
+      });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
+}
+
+interface File {
+  id: number;
+  name: string;
+  path: string;
+  type: string;
+  size: number;
+  folderId: number | null;
 }
