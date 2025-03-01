@@ -139,17 +139,23 @@ export default function Files() {
   });
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
 
     const formData = new FormData();
-    formData.append("file", file);
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const relativePath = file.webkitRelativePath || file.name;
+      formData.append("files", file);
+      formData.append("paths", relativePath);
+    }
+
     if (currentFolderId) {
       formData.append("folderId", currentFolderId.toString());
     }
 
     uploadFileMutation.mutate(formData);
-    // Reset the input
     event.target.value = "";
   };
 
@@ -204,9 +210,11 @@ export default function Files() {
                 type="file"
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 onChange={handleFileUpload}
+                webkitdirectory="true"
+                multiple
               />
               <Upload className="h-4 w-4 mr-2" />
-              Upload File
+              Upload Folder
             </Button>
           </div>
         </div>

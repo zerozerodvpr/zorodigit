@@ -21,13 +21,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     cookie: { secure: false }
   }));
 
-  // Configure multer for file uploads
+  // Update the file upload middleware configuration
   const upload = multer({
     storage: multer.diskStorage({
-      destination: "./uploads",
+      destination: async (req, file, cb) => {
+        // Extract the directory path from the relative path
+        const relativePath = file.originalname.split('/');
+        relativePath.pop(); // Remove the filename
+        const dirPath = path.join('./uploads', ...relativePath);
+
+        // Create the directory if it doesn't exist
+        await fs.mkdir(dirPath, { recursive: true });
+        cb(null, dirPath);
+      },
       filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+        // Use the original filename
+        cb(null, file.originalname.split('/').pop() || file.originalname);
       }
     })
   });
@@ -124,33 +133,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(files);
   });
 
-  app.post("/api/files", requireAuth, upload.single("file"), async (req, res) => {
+  // Update the file upload route to handle multiple files
+  app.post("/api/files", requireAuth, upload.array("files"), async (req, res) => {
     try {
-      if (!req.file) {
-        return res.status(400).json({ message: "No file uploaded" });
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ message: "No files uploaded" });
       }
 
-      const fileData = {
-        name: req.file.originalname,
-        type: req.file.mimetype,
-        size: req.file.size,
-        path: req.file.path,
-        folderId: req.body.folderId ? parseInt(req.body.folderId) : null,
-      };
+      const files = Array.isArray(req.files) ? req.files : [req.files];
+      const paths = req.body.paths ? (Array.isArray(req.body.paths) ? req.body.paths : [req.body.paths]) : [];
 
-      try {
-        const parsedFile = insertFileSchema.parse(fileData);
-        const created = await storage.createFile(parsedFile);
-        res.json(created);
-      } catch (error) {
-        // Clean up the uploaded file if validation fails
-        await fs.unlink(req.file.path);
-        throw error;
+      const createdFiles = [];
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const relativePath = paths[i] || file.originalname;
+
+        const fileData = {
+          name: file.originalname,
+          type: file.mimetype,
+          size: file.size,
+          path: file.path,
+          folderId: req.body.folderId ? parseInt(req.body.folderId) : null,
+        };
+
+        try {
+          const parsedFile = insertFileSchema.parse(fileData);
+          const created = await storage.createFile(parsedFile);
+          createdFiles.push(created);
+        } catch (error) {
+          // Clean up the uploaded file if validation fails
+          await fs.unlink(file.path);
+          throw error;
+        }
       }
+
+      res.json(createdFiles);
     } catch (error) {
       console.error("File upload error:", error);
-      res.status(400).json({ 
-        message: error instanceof Error ? error.message : "Failed to upload file" 
+      res.status(400).json({
+        message: error instanceof Error ? error.message : "Failed to upload files"
       });
     }
   });
